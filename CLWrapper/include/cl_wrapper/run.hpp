@@ -16,6 +16,8 @@
 
 #include "cl_error_lookup.hpp"
 
+#include "cl_wrapper/kernel_manager.hpp"
+
 namespace clwrapper
 {
 
