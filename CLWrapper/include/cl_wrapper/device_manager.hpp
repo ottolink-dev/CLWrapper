@@ -183,6 +183,18 @@ private:
   // Private constructor
   DeviceManager();
 
+  /**
+   * @brief Computes a robustness capability score for a given OpenCL device.
+   * 
+   * Scores are calculated based on device type (GPU > Accelerator > CPU),
+   * discrete vs unified memory, compute capacity (units * clock speed), and 
+   * total global memory size.
+   * 
+   * @param device The cl::Device to evaluate.
+   * @return A numerical score representing the capability level of the device.
+   */
+  double evaluate_device(const cl::Device &device) const;
+
   // Delete copy constructor and assignment operator to enforce singleton
   DeviceManager(const DeviceManager &) = delete;
   DeviceManager &operator=(const DeviceManager &) = delete;

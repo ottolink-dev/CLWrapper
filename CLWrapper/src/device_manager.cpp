@@ -9,22 +9,6 @@
 namespace clwrapper
 {
 
-namespace
-{
-bool helper_find_string_insensitive(const std::string &text,
-                                    const std::string &word)
-{
-  // https://stackoverflow.com/questions/3152241
-  auto it = std::search(text.begin(),
-                        text.end(),
-                        word.begin(),
-                        word.end(),
-                        [](unsigned char ch1, unsigned char ch2)
-                        { return std::toupper(ch1) == std::toupper(ch2); });
-  return (it != text.end());
-}
-} // namespace
-
 DeviceManager::DeviceManager()
 {
   Logger::log()->trace("DeviceManager::DeviceManager");
@@ -37,10 +21,9 @@ DeviceManager::DeviceManager()
 
   if (platforms.empty()) throw std::runtime_error("No OpenCL platforms found!");
 
-  // select the platform with the most computational resources
-  // (assuming one device / per platform)
-  int platform_index = -1;
-  int flops_best = -1;
+  int best_platform_idx = -1;
+  int best_device_idx = -1;
+  double best_score = -1.0;
 
   Logger::log()->trace("checking device performances...");
 
@@ -53,55 +36,37 @@ DeviceManager::DeviceManager()
     std::vector<cl::Device> devices;
     platforms[kp].getDevices(this->device_type, &devices);
 
-    if (devices.empty())
+    for (size_t kd = 0; kd < devices.size(); kd++)
     {
-      Logger::log()->trace("No OpenCL devices found for this platform");
-    }
-    else
-    {
-      // estimate of the number of cores per computational unit for the
-      // platform
-      std::string vendor = devices[0].getInfo<CL_DEVICE_VENDOR>();
-      int         cores = 1;
+      double score = evaluate_device(devices[kd]);
+      Logger::log()->trace("rating - device: {}, score: {}",
+                           devices[kd].getInfo<CL_DEVICE_NAME>().c_str(),
+                           score);
 
-      if (helper_find_string_insensitive(vendor, "nvidia") ||
-          helper_find_string_insensitive(vendor, "amd"))
-        cores = 128;
-      else if (helper_find_string_insensitive(vendor, "intel"))
-        cores = 16;
-
-      int flops = (int)devices[0].getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() *
-                  (int)devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() *
-                  cores;
-
-      if (flops > flops_best)
+      if (score > best_score)
       {
-        flops_best = flops;
-        platform_index = (int)kp;
+        best_score = score;
+        best_platform_idx = static_cast<int>(kp);
+        best_device_idx = static_cast<int>(kd);
       }
-
-      Logger::log()->trace("rating - device: {}, vendor: {}, rating: {}",
-                           devices[0].getInfo<CL_DEVICE_NAME>().c_str(),
-                           vendor.c_str(),
-                           flops);
     }
   }
 
-  if (platform_index == -1)
+  if (best_platform_idx == -1 || best_device_idx == -1)
   {
     throw std::runtime_error("No OpenCL devices matching the device type filter were found!");
   }
 
   // eventually assign the platform / device
   std::vector<cl::Device> devices;
-  platforms[platform_index].getDevices(this->device_type, &devices);
+  platforms[best_platform_idx].getDevices(this->device_type, &devices);
   if (devices.empty())
   {
     throw std::runtime_error("Selected platform has no devices matching the device type filter!");
   }
-  this->cl_device = devices[0];
-  this->platform_id = platform_index;
-  this->device_index = 0;
+  this->cl_device = devices[best_device_idx];
+  this->platform_id = best_platform_idx;
+  this->device_index = best_device_idx;
 
   Logger::log()->info("Selected OpenCL device: {}",
                       this->cl_device.getInfo<CL_DEVICE_NAME>().c_str());
@@ -112,6 +77,67 @@ DeviceManager::DeviceManager()
 cl::Device DeviceManager::device()
 {
   return DeviceManager::get_instance().get_device();
+}
+
+double DeviceManager::evaluate_device(const cl::Device &device) const
+{
+  double score = 0.0;
+
+  // 1. Device Type Priority
+  cl_device_type type = device.getInfo<CL_DEVICE_TYPE>();
+  if (type & CL_DEVICE_TYPE_GPU)
+  {
+    score += 10000.0;
+    
+    // 2. Discrete vs Integrated GPU (favor discrete)
+    cl_bool unified_mem = CL_TRUE;
+    try
+    {
+      unified_mem = device.getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
+    }
+    catch (...) {} // Fallback if unified memory attribute is not supported
+    
+    if (unified_mem == CL_FALSE)
+    {
+      score += 5000.0;
+    }
+  }
+  else if (type & CL_DEVICE_TYPE_ACCELERATOR)
+  {
+    score += 5000.0;
+  }
+  else if (type & CL_DEVICE_TYPE_CPU)
+  {
+    score += 1000.0;
+  }
+  else
+  {
+    score += 100.0;
+  }
+
+  // 3. Compute capacity (Compute Units * Clock Frequency)
+  cl_uint compute_units = 1;
+  cl_uint clock_freq = 1;
+  try
+  {
+    compute_units = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
+    clock_freq = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
+  }
+  catch (...) {}
+
+  score += static_cast<double>(compute_units) * clock_freq * 1e-3;
+
+  // 4. Memory capacity tie-breaker
+  cl_ulong global_mem = 0;
+  try
+  {
+    global_mem = device.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
+  }
+  catch (...) {}
+
+  score += static_cast<double>(global_mem) * 1e-12;
+
+  return score;
 }
 
 std::map<std::pair<size_t, size_t>, std::string> DeviceManager::get_all_available_devices()
