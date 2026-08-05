@@ -1,4 +1,4 @@
-add_executable(unit_tests test_device_manager.cpp)
+add_executable(unit_tests test_device_manager.cpp test_kernel_manager.cpp)
 target_link_libraries(unit_tests
   PRIVATE
     GTest::gtest
