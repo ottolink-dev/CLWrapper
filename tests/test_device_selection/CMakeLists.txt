@@ -1,2 +1,0 @@
-add_executable(test_device_selection main.cpp)
-target_link_libraries(test_device_selection clwrapper)

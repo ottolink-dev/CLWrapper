@@ -1,5 +1,7 @@
-#include "cl_wrapper/device_manager.hpp"
 #include <gtest/gtest.h>
+#include "cl_wrapper/device_manager.hpp"
+#include "cl_wrapper/kernel_manager.hpp"
+#include "cl_wrapper/run.hpp"
 
 using namespace clwrapper;
 
@@ -93,4 +95,57 @@ TEST(DeviceManagerTest, SetDeviceTypeFilterAutoRediscoveryTest)
   // Restore original configuration
   dm.set_device_type(CL_DEVICE_TYPE_ALL);
   dm.set_device(current_platform, current_device);
+}
+
+TEST(DeviceManagerTest, DeviceSwitchAndExecutionTest)
+{
+  DeviceManager &dm = DeviceManager::get_instance();
+  KernelManager &km = KernelManager::get_instance();
+
+  size_t original_platform = dm.get_platform_id();
+  size_t original_device = dm.get_device_index();
+
+  auto devices = dm.get_all_available_devices();
+
+  const std::string code =
+      "__kernel void simple_add(__global const float* a, __global const float* "
+      "b, __global float* c) {\n"
+      "    int id = get_global_id(0);\n"
+      "    c[id] = a[id] + b[id];\n"
+      "}\n";
+
+  for (auto &[coords, name] : devices)
+  {
+    // Select device
+    ASSERT_TRUE(dm.set_device(coords.first, coords.second));
+
+    // Build program for this device
+    km.add_kernel(code, true, true);
+
+    // Execute a run
+    clwrapper::Run     run("simple_add");
+    int                n = 5;
+    std::vector<float> a(n, 1.0f);
+    std::vector<float> b(n, 2.0f);
+    std::vector<float> c(n, 0.0f);
+
+    run.bind_buffer<float>("a", a);
+    run.bind_buffer<float>("b", b);
+    run.bind_buffer<float>("c", c);
+
+    run.write_buffer("a");
+    run.write_buffer("b");
+
+    EXPECT_NO_THROW(run.execute(n));
+
+    run.read_buffer("c");
+
+    for (int i = 0; i < n; ++i)
+    {
+      EXPECT_FLOAT_EQ(c[i], 3.0f);
+    }
+  }
+
+  // Restore original device
+  dm.set_device(original_platform, original_device);
 }
