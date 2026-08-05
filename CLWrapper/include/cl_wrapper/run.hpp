@@ -98,6 +98,7 @@ public:
    */
   template <typename T> void bind_arguments(T arg)
   {
+    this->validate_argument(this->arg_count, "", "scalar");
     this->err = this->cl_kernel.setArg(this->arg_count++, arg);
     clerror::throw_opencl_error(this->err);
   }
@@ -136,8 +137,9 @@ public:
                    std::vector<T>    &vector,
                    cl_mem_flags       flags = CL_MEM_READ_WRITE)
   {
-    Buffer buffer;
+    this->validate_argument(this->arg_count, id, "buffer");
 
+    Buffer buffer;
     buffer.vector_ref = static_cast<void *>(vector.data());
     buffer.size = vector_sizeof<T>(vector);
     buffer.cl_buffer = cl::Buffer(KernelManager::context(),
@@ -262,6 +264,12 @@ private:
   std::map<std::string, Image2D> images_2d;
 
   int err = 0;
+
+  // Internal validation helper to verify argument names and types using OpenCL
+  // reflection
+  void validate_argument(int                index,
+                         const std::string &expected_name,
+                         const std::string &cpp_type_name);
 };
 
 } // namespace clwrapper

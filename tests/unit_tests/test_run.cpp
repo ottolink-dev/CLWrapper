@@ -88,3 +88,31 @@ TEST(RunTest, ImageBindingAndExecution)
     EXPECT_FLOAT_EQ(dest_data[i], 6.0f);
   }
 }
+
+TEST(RunTest, ArgumentValidationTest)
+{
+  KernelManager &km = KernelManager::get_instance();
+  km.clear_sources();
+
+  const std::string code = "__kernel void simple_scalar_add(__global const "
+                           "float* a, float factor, __global float* b) {\n"
+                           "    int id = get_global_id(0);\n"
+                           "    b[id] = a[id] + factor;\n"
+                           "}\n";
+
+  km.add_kernel(code, true, true);
+
+  clwrapper::Run     run("simple_scalar_add");
+  int                n = 5;
+  std::vector<float> a(n, 1.0f);
+  std::vector<float> b(n, 0.0f);
+  float              factor = 5.0f;
+
+  // Bind wrong argument name on purpose (should log warning but not
+  // crash/throw)
+  EXPECT_NO_THROW({
+    run.bind_buffer("wrong_name_a", a);
+    run.bind_arguments(factor);
+    run.bind_buffer("b", b);
+  });
+}
