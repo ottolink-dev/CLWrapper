@@ -5,7 +5,8 @@
 /**
  * @file kernel_manager.hpp
  * @author Otto Link (otto.link.bv@gmail.com)
- * @brief Singleton manager to handle OpenCL context creation, program compilation, and kernel building.
+ * @brief Singleton manager to handle OpenCL context creation, program
+ * compilation, and kernel building.
  * @copyright Copyright (c) 2025
  */
 #pragma once
@@ -19,10 +20,11 @@ namespace clwrapper
 
 /**
  * @class KernelManager
- * @brief Manages OpenCL context, compilation, and registration of kernel sources.
- * 
- * Handles the compilation of OpenCL program objects, tracking available kernels,
- * and maintaining program build options in a thread-safe manner.
+ * @brief Manages OpenCL context, compilation, and registration of kernel
+ * sources.
+ *
+ * Handles the compilation of OpenCL program objects, tracking available
+ * kernels, and maintaining program build options in a thread-safe manner.
  */
 class KernelManager
 {
@@ -34,18 +36,20 @@ public:
 
   /**
    * @brief Gets the global singleton instance of the KernelManager.
-   * @return A reference to the active KernelManager instance.
+   * @return A reference to the active DeviceManager instance.
    */
   static KernelManager &get_instance();
 
   /**
-   * @brief Gets the OpenCL context attached to the active KernelManager instance.
+   * @brief Gets the OpenCL context attached to the active KernelManager
+   * instance.
    * @return The active cl::Context.
    */
   static cl::Context context();
 
   /**
-   * @brief Gets the OpenCL program attached to the active KernelManager instance.
+   * @brief Gets the OpenCL program attached to the active KernelManager
+   * instance.
    * @return The active cl::Program.
    */
   static cl::Program program();
@@ -58,15 +62,20 @@ public:
    */
 
   /**
-   * @brief Appends or replaces OpenCL kernel source code and triggers a rebuild.
+   * @brief Appends or replaces OpenCL kernel source code and optionally
+   * triggers a rebuild.
    * @param kernel_sources The OpenCL source code string to register.
-   * @param clear_sources If true, replaces existing sources; if false, appends them.
+   * @param clear_sources If true, replaces existing sources; if false, appends
+   * them.
+   * @param trigger_build If true, compiles the program immediately.
    */
   void add_kernel(const std::string &kernel_sources,
-                  bool               clear_sources = false);
+                  bool               clear_sources = false,
+                  bool               trigger_build = true);
 
   /**
-   * @brief Compiles the registered OpenCL program sources with configured build options.
+   * @brief Compiles the registered OpenCL program sources with configured build
+   * options.
    */
   void build_program();
 
@@ -128,6 +137,10 @@ private:
 
   // Private constructor
   KernelManager();
+
+  // Internal helper to compile program sources (assumes state_mutex is already
+  // locked for writing)
+  void build_program_internal();
 
   // Delete copy/move constructors and assignment operators to enforce singleton
   KernelManager(const KernelManager &) = delete;

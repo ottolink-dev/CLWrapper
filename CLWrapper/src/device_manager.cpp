@@ -40,7 +40,9 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       {
         unified_mem = device.getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
       }
-      catch (...) {} // Fallback if unified memory attribute is not supported
+      catch (...)
+      {
+      } // Fallback if unified memory attribute is not supported
 
       if (unified_mem == CL_FALSE)
       {
@@ -68,7 +70,9 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       compute_units = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
       clock_freq = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
     }
-    catch (...) {}
+    catch (...)
+    {
+    }
 
     score += static_cast<double>(compute_units) * clock_freq * 1e-3;
 
@@ -78,18 +82,23 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
     {
       global_mem = device.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
     }
-    catch (...) {}
+    catch (...)
+    {
+    }
 
     score += static_cast<double>(global_mem) * 1e-12;
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 
   return score;
 }
 
-std::map<std::pair<size_t, size_t>, std::string> DeviceManager::get_all_available_devices()
+std::map<std::pair<size_t, size_t>, std::string> DeviceManager::
+    get_all_available_devices()
 {
-  std::shared_lock<std::shared_mutex> lock(this->state_mutex);
+  std::shared_lock<std::shared_mutex>              lock(this->state_mutex);
   std::map<std::pair<size_t, size_t>, std::string> device_map = {};
 
   try
@@ -114,7 +123,9 @@ std::map<std::pair<size_t, size_t>, std::string> DeviceManager::get_all_availabl
       }
     }
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 
   return device_map;
 }
@@ -122,7 +133,7 @@ std::map<std::pair<size_t, size_t>, std::string> DeviceManager::get_all_availabl
 std::map<size_t, std::string> DeviceManager::get_available_devices()
 {
   std::shared_lock<std::shared_mutex> lock(this->state_mutex);
-  std::map<size_t, std::string> device_map = {};
+  std::map<size_t, std::string>       device_map = {};
 
   try
   {
@@ -146,7 +157,9 @@ std::map<size_t, std::string> DeviceManager::get_available_devices()
       }
     }
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 
   return device_map;
 }
@@ -357,8 +370,8 @@ void DeviceManager::select_optimal_device()
 
   if (platforms.empty()) throw std::runtime_error("No OpenCL platforms found!");
 
-  int best_platform_idx = -1;
-  int best_device_idx = -1;
+  int    best_platform_idx = -1;
+  int    best_device_idx = -1;
   double best_score = -1.0;
 
   Logger::log()->trace("checking device performances...");
@@ -390,7 +403,8 @@ void DeviceManager::select_optimal_device()
 
   if (best_platform_idx == -1 || best_device_idx == -1)
   {
-    throw std::runtime_error("No OpenCL devices matching the device type filter were found!");
+    throw std::runtime_error(
+        "No OpenCL devices matching the device type filter were found!");
   }
 
   // eventually assign the platform / device
@@ -398,7 +412,8 @@ void DeviceManager::select_optimal_device()
   platforms[best_platform_idx].getDevices(this->device_type, &devices);
   if (devices.empty())
   {
-    throw std::runtime_error("Selected platform has no devices matching the device type filter!");
+    throw std::runtime_error(
+        "Selected platform has no devices matching the device type filter!");
   }
   this->cl_device = devices[best_device_idx];
   this->platform_id = best_platform_idx;
@@ -418,14 +433,17 @@ bool DeviceManager::set_device(size_t platform_id)
 bool DeviceManager::set_device(size_t platform_id, size_t device_index)
 {
   std::unique_lock<std::shared_mutex> lock(this->state_mutex);
-  std::vector<cl::Platform> platforms;
+  std::vector<cl::Platform>           platforms;
   cl::Platform::get(&platforms);
 
   if (platforms.empty()) throw std::runtime_error("No OpenCL platforms found!");
 
   if (platform_id >= platforms.size())
   {
-    Logger::log()->error("Platform ID {} is out of bounds (total platforms: {})", platform_id, platforms.size());
+    Logger::log()->error(
+        "Platform ID {} is out of bounds (total platforms: {})",
+        platform_id,
+        platforms.size());
     return false;
   }
 
@@ -434,7 +452,11 @@ bool DeviceManager::set_device(size_t platform_id, size_t device_index)
 
   if (device_index >= devices.size())
   {
-    Logger::log()->error("Device index {} is out of bounds for platform {} (total devices: {})", device_index, platform_id, devices.size());
+    Logger::log()->error(
+        "Device index {} is out of bounds for platform {} (total devices: {})",
+        device_index,
+        platform_id,
+        devices.size());
     return false;
   }
 
@@ -475,7 +497,9 @@ void log_device_infos(cl::Device cl_device)
     default: Logger::log()->info(" - device Type: unknown");
     }
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 }
 
 } // namespace clwrapper

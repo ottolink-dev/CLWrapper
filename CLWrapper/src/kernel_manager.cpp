@@ -15,11 +15,12 @@ namespace clwrapper
 
 KernelManager::KernelManager()
 {
-  this->build_program();
+  this->build_program_internal();
 }
 
 void KernelManager::add_kernel(const std::string &kernel_sources,
-                               bool               clear_sources)
+                               bool               clear_sources,
+                               bool               trigger_build)
 {
   std::unique_lock<std::shared_mutex> lock(this->state_mutex);
   if (clear_sources)
@@ -27,10 +28,19 @@ void KernelManager::add_kernel(const std::string &kernel_sources,
   else
     this->full_sources += kernel_sources;
 
-  this->build_program();
+  if (trigger_build)
+  {
+    this->build_program_internal();
+  }
 }
 
 void KernelManager::build_program()
+{
+  std::unique_lock<std::shared_mutex> lock(this->state_mutex);
+  this->build_program_internal();
+}
+
+void KernelManager::build_program_internal()
 {
   Logger::log()->trace("loading kernel sources");
 
@@ -49,16 +59,24 @@ void KernelManager::build_program()
       Logger::log()->trace("build options: {}", this->build_options);
 
       this->cl_program = cl::Program(this->cl_context, sources);
-      int err = this->cl_program.build({cl_device}, this->build_options.c_str());
+      int err = this->cl_program.build({cl_device},
+                                       this->build_options.c_str());
 
       if (err != 0)
       {
-        std::string build_log = this->cl_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(cl_device);
-        Logger::log()->critical("build error: {}\nOpenCL compiler says:\n----------------------------------------------\n{}\n----------------------------------------------", err, build_log);
+        std::string build_log =
+            this->cl_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(cl_device);
+        Logger::log()->critical(
+            "build error: {}\nOpenCL compiler "
+            "says:\n----------------------------------------------\n{}\n-------"
+            "---------------------------------------",
+            err,
+            build_log);
         clerror::throw_opencl_error(err);
       }
 
-      std::string kernel_names = this->cl_program.getInfo<CL_PROGRAM_KERNEL_NAMES>();
+      std::string kernel_names = this->cl_program
+                                     .getInfo<CL_PROGRAM_KERNEL_NAMES>();
       Logger::log()->trace("available kernels: {}", kernel_names.c_str());
     }
     catch (const std::exception &e)
