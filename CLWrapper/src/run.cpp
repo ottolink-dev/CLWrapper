@@ -22,8 +22,8 @@ Run::Run(const std::string &kernel_name) : kernel_name(kernel_name)
 
   this->cl_kernel = cl::Kernel(KernelManager::program(),
                                this->kernel_name.c_str(),
-                               &err);
-  clerror::throw_opencl_error(err);
+                               &this->err);
+  clerror::throw_opencl_error(this->err);
 }
 
 Run::~Run()
@@ -51,7 +51,7 @@ void Run::bind_imagef(const std::string  &id,
                                height,
                                0,
                                (void *)img.vector_ref,
-                               &err);
+                               &this->err);
   else
     img.cl_image = cl::Image2D(KernelManager::context(),
                                CL_MEM_WRITE_ONLY,
@@ -60,12 +60,12 @@ void Run::bind_imagef(const std::string  &id,
                                height,
                                0,
                                nullptr,
-                               &err);
+                               &this->err);
 
-  clerror::throw_opencl_error(err);
+  clerror::throw_opencl_error(this->err);
 
-  err = this->cl_kernel.setArg(this->arg_count++, img.cl_image);
-  clerror::throw_opencl_error(err);
+  this->err = this->cl_kernel.setArg(this->arg_count++, img.cl_image);
+  clerror::throw_opencl_error(this->err);
 
   this->images_2d[id] = img;
 }
@@ -77,7 +77,7 @@ void Run::bind_imagef(const std::string  &id,
                       bool                is_out)
 {
   Direction direction = is_out ? Direction::OUT : Direction::IN;
-  bind_imagef(id, vector, width, height, direction);
+  this->bind_imagef(id, vector, width, height, direction);
 }
 
 void Run::bind_imagef(const std::string        &id,
@@ -86,38 +86,33 @@ void Run::bind_imagef(const std::string        &id,
                       int                       height,
                       bool                      is_out)
 {
-  bind_imagef(id,
-              const_cast<std::vector<float> &>(vector),
-              width,
-              height,
-              is_out);
+  this->bind_imagef(id,
+                    const_cast<std::vector<float> &>(vector),
+                    width,
+                    height,
+                    is_out);
 }
 
 void Run::execute(int total_elements, float *p_elapsed_time)
 {
-  // Logger::log()->trace("executing... [%s]", this->kernel_name.c_str());
-
   this->queue.flush();
 
-  // ensure gloabl size is rounded up to the nearest multiple of a power of 2 to
-  // avoid weird global size with no divisor
   int bsize = 8;
   int gsize = ((total_elements + bsize - 1) / bsize) * bsize;
 
   const cl::NDRange global_work_size(gsize);
 
-  err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
-                                         cl::NullRange,
-                                         global_work_size,
-                                         cl::NullRange);
-  clerror::throw_opencl_error(err);
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
 
   auto t0 = std::chrono::high_resolution_clock::now();
 
-  err = this->queue.finish();
-  clerror::throw_opencl_error(err);
+  this->err = this->queue.finish();
+  clerror::throw_opencl_error(this->err);
 
-  // compute elapsed time
   if (p_elapsed_time)
   {
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -131,8 +126,6 @@ void Run::execute(int total_elements, float *p_elapsed_time)
 void Run::execute(const std::vector<int> &global_range_2d,
                   float                  *p_elapsed_time)
 {
-  // Logger::log()->trace("executing... [%s]", this->kernel_name.c_str());
-
   this->queue.flush();
 
   int bsize = 8;
@@ -141,18 +134,17 @@ void Run::execute(const std::vector<int> &global_range_2d,
 
   const cl::NDRange global_work_size(gsize_x, gsize_y);
 
-  err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
-                                         cl::NullRange,
-                                         global_work_size,
-                                         cl::NullRange);
-  clerror::throw_opencl_error(err);
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
 
   auto t0 = std::chrono::high_resolution_clock::now();
 
-  err = this->queue.flush();
-  clerror::throw_opencl_error(err);
+  this->err = this->queue.flush();
+  clerror::throw_opencl_error(this->err);
 
-  // compute elapsed time
   if (p_elapsed_time)
   {
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -167,12 +159,12 @@ void Run::read_buffer(const std::string &id)
 {
   if (this->buffers.find(id) != this->buffers.end())
   {
-    err = this->queue.enqueueReadBuffer(buffers[id].cl_buffer,
-                                        CL_TRUE,
-                                        0,
-                                        buffers[id].size,
-                                        buffers[id].vector_ref);
-    clerror::throw_opencl_error(err);
+    this->err = this->queue.enqueueReadBuffer(this->buffers[id].cl_buffer,
+                                              CL_TRUE,
+                                              0,
+                                              this->buffers[id].size,
+                                              this->buffers[id].vector_ref);
+    clerror::throw_opencl_error(this->err);
   }
   else
   {
@@ -189,14 +181,14 @@ void Run::read_imagef(const std::string &id)
                                    (size_t)this->images_2d[id].height,
                                    1};
 
-    err = queue.enqueueReadImage(this->images_2d[id].cl_image,
-                                 CL_TRUE,
-                                 origin,
-                                 region,
-                                 0,
-                                 0,
-                                 this->images_2d[id].vector_ref);
-    clerror::throw_opencl_error(err);
+    this->err = this->queue.enqueueReadImage(this->images_2d[id].cl_image,
+                                             CL_TRUE,
+                                             origin,
+                                             region,
+                                             0,
+                                             0,
+                                             this->images_2d[id].vector_ref);
+    clerror::throw_opencl_error(this->err);
   }
   else
   {
@@ -204,16 +196,21 @@ void Run::read_imagef(const std::string &id)
   }
 }
 
+void Run::reset_argcount()
+{
+  this->arg_count = 0;
+}
+
 void Run::write_buffer(const std::string &id)
 {
   if (this->buffers.find(id) != this->buffers.end())
   {
-    err = this->queue.enqueueWriteBuffer(buffers[id].cl_buffer,
-                                         CL_TRUE,
-                                         0,
-                                         buffers[id].size,
-                                         buffers[id].vector_ref);
-    clerror::throw_opencl_error(err);
+    this->err = this->queue.enqueueWriteBuffer(this->buffers[id].cl_buffer,
+                                               CL_TRUE,
+                                               0,
+                                               this->buffers[id].size,
+                                               this->buffers[id].vector_ref);
+    clerror::throw_opencl_error(this->err);
   }
   else
   {
@@ -230,14 +227,14 @@ void Run::write_imagef(const std::string &id)
                                    (size_t)this->images_2d[id].height,
                                    1};
 
-    err = queue.enqueueWriteImage(this->images_2d[id].cl_image,
-                                  CL_TRUE,
-                                  origin,
-                                  region,
-                                  0,
-                                  0,
-                                  this->images_2d[id].vector_ref);
-    clerror::throw_opencl_error(err);
+    this->err = this->queue.enqueueWriteImage(this->images_2d[id].cl_image,
+                                              CL_TRUE,
+                                              origin,
+                                              region,
+                                              0,
+                                              0,
+                                              this->images_2d[id].vector_ref);
+    clerror::throw_opencl_error(this->err);
   }
   else
   {

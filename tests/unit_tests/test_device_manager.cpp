@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
 #include "cl_wrapper/device_manager.hpp"
 #include "cl_wrapper/kernel_manager.hpp"
 #include "cl_wrapper/run.hpp"
+#include <gtest/gtest.h>
 
 using namespace clwrapper;
 
