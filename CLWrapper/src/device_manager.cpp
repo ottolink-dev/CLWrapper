@@ -9,6 +9,8 @@
 namespace clwrapper
 {
 
+namespace
+{
 bool helper_find_string_insensitive(const std::string &text,
                                     const std::string &word)
 {
@@ -20,6 +22,27 @@ bool helper_find_string_insensitive(const std::string &text,
                         [](unsigned char ch1, unsigned char ch2)
                         { return std::toupper(ch1) == std::toupper(ch2); });
   return (it != text.end());
+}
+} // namespace
+
+bool DeviceManager::is_ready()
+{
+  try
+  {
+    DeviceManager::get_instance();
+  }
+  catch (const std::exception &e)
+  {
+    Logger::log()->error("Error: {}", e.what());
+    return false;
+  }
+  catch (...)
+  {
+    Logger::log()->error("Unknown error");
+    return false;
+  }
+
+  return true;
 }
 
 DeviceManager::DeviceManager()

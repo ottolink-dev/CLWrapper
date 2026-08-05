@@ -27,25 +27,7 @@ public:
     return instance;
   }
 
-  static bool is_ready()
-  {
-    try
-    {
-      DeviceManager::get_instance();
-    }
-    catch (const std::exception &e)
-    {
-      // LOG_ERROR("Error: %s", e.what());
-      return false;
-    }
-    catch (...)
-    {
-      // LOG_ERROR("Unknown error");
-      return false;
-    }
-
-    return true;
-  }
+  static bool is_ready();
 
   // Get the OpenCL device attached to the singleton instance
   static cl::Device device()

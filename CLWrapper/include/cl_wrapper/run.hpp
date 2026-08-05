@@ -101,7 +101,7 @@ public:
                    const std::vector<T> &vector,
                    cl_mem_flags          flags = CL_MEM_READ_WRITE)
   {
-    this->bind_buffer<T>(id, const_cast<std::vector<float> &>(vector), flags);
+    this->bind_buffer<T>(id, const_cast<std::vector<T> &>(vector), flags);
   }
 
   // data are copied at binding

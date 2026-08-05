@@ -9,8 +9,6 @@
 #include "cl_wrapper/kernel_manager.hpp"
 #include "cl_wrapper/logger.hpp"
 
-#include <iostream>
-
 namespace clwrapper
 {
 
