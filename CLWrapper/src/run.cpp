@@ -37,8 +37,6 @@ void Run::bind_imagef(const std::string  &id,
                       int                 height,
                       Direction           direction)
 {
-  this->validate_argument(this->arg_count, id, "image");
-
   Image2D img;
 
   img.vector_ref = static_cast<void *>(vector.data());
@@ -201,69 +199,6 @@ void Run::read_imagef(const std::string &id)
 void Run::reset_argcount()
 {
   this->arg_count = 0;
-}
-
-void Run::validate_argument(int                index,
-                            const std::string &expected_name,
-                            const std::string &cpp_type_name)
-{
-  try
-  {
-    // 1. Validate argument name (if expected_name is provided)
-    std::string cl_name = this->cl_kernel.getArgInfo<CL_KERNEL_ARG_NAME>(index);
-    if (!expected_name.empty() && !cl_name.empty() && cl_name != expected_name)
-    {
-      Logger::log()->warn("Argument index {} ('{}') mismatch: Kernel source "
-                          "defines parameter name as '{}'",
-                          index,
-                          expected_name,
-                          cl_name);
-    }
-
-    // 2. Validate type category (pointer vs scalar/image)
-    std::string cl_type = this->cl_kernel.getArgInfo<CL_KERNEL_ARG_TYPE_NAME>(
-        index);
-    if (cl_type.find("*") != std::string::npos)
-    {
-      if (cpp_type_name == "scalar")
-      {
-        Logger::log()->warn("Argument index {} ('{}') type mismatch: Kernel "
-                            "expects pointer type '{}', but scalar was bound",
-                            index,
-                            cl_name.empty() ? expected_name : cl_name,
-                            cl_type);
-      }
-    }
-    else if (cl_type.find("image2d_t") != std::string::npos)
-    {
-      if (cpp_type_name != "image")
-      {
-        Logger::log()->warn(
-            "Argument index {} ('{}') type mismatch: Kernel expects 2D image "
-            "type '{}', but non-image was bound",
-            index,
-            cl_name.empty() ? expected_name : cl_name,
-            cl_type);
-      }
-    }
-    else
-    {
-      if (cpp_type_name == "buffer" || cpp_type_name == "image")
-      {
-        Logger::log()->warn(
-            "Argument index {} ('{}') type mismatch: Kernel expects scalar "
-            "type '{}', but buffer/image was bound",
-            index,
-            cl_name.empty() ? expected_name : cl_name,
-            cl_type);
-      }
-    }
-  }
-  catch (...)
-  {
-    // Silently ignore if compiler info flag is missing or unsupported by the
-    // platform/driver
-  }
 }
 
 void Run::write_buffer(const std::string &id)

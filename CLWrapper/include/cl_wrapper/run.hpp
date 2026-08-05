@@ -5,14 +5,13 @@
 /**
  * @file run.hpp
  * @author Otto Link (otto.link.bv@gmail.com)
- * @brief Handles OpenCL kernel execution, argument bindings, and memory
- * transfers.
+ * @brief Handles OpenCL kernel execution, argument bindings, and memory transfers.
  * @copyright Copyright (c) 2025
  */
 #pragma once
 #include <map>
-#include <string>
 #include <vector>
+#include <string>
 
 #include <CL/opencl.hpp>
 
@@ -40,8 +39,8 @@ template <typename T> size_t vector_sizeof(const typename std::vector<T> &v)
 struct Buffer
 {
   cl::Buffer cl_buffer;  ///< The OpenCL buffer object.
-  void      *vector_ref; ///< Host pointer reference.
-  size_t     size;       ///< Total buffer size in bytes.
+  void      *vector_ref;  ///< Host pointer reference.
+  size_t     size;        ///< Total buffer size in bytes.
 };
 
 /**
@@ -50,30 +49,28 @@ struct Buffer
  */
 struct Image2D
 {
-  cl::Image2D cl_image;   ///< The OpenCL 2D image object.
-  void       *vector_ref; ///< Host pointer reference.
-  int         width;      ///< Width of the 2D image.
-  int         height;     ///< Height of the 2D image.
+  cl::Image2D cl_image;    ///< The OpenCL 2D image object.
+  void       *vector_ref;  ///< Host pointer reference.
+  int         width;       ///< Width of the 2D image.
+  int         height;      ///< Height of the 2D image.
 };
 
 /**
  * @enum Direction
- * @brief Declares the data flow direction relative to the host for image
- * bindings.
+ * @brief Declares the data flow direction relative to the host for image bindings.
  */
 enum Direction
 {
-  IN, ///< Input data flow (read-only on device).
-  OUT ///< Output data flow (write-only on device).
+  IN,   ///< Input data flow (read-only on device).
+  OUT   ///< Output data flow (write-only on device).
 };
 
 /**
  * @class Run
  * @brief Handles single execution instances of a specific OpenCL kernel.
- *
- * Manages binding simple arguments, 1D buffers, and 2D images, triggering
- * NDRange kernel execution, and transferring data between device and host
- * memory.
+ * 
+ * Manages binding simple arguments, 1D buffers, and 2D images, triggering NDRange kernel
+ * execution, and transferring data between device and host memory.
  */
 class Run
 {
@@ -85,20 +82,17 @@ public:
   Run(const std::string &kernel_name);
 
   /**
-   * @brief Destructor. Automatically flushes and finishes active command
-   * queues.
+   * @brief Destructor. Automatically flushes and finishes active command queues.
    */
   ~Run();
 
   /**
-   * @brief Binds a single value argument to the next available kernel argument
-   * index.
+   * @brief Binds a single value argument to the next available kernel argument index.
    * @tparam T The argument type.
    * @param arg The value to bind.
    */
   template <typename T> void bind_arguments(T arg)
   {
-    this->validate_argument(this->arg_count, "", "scalar");
     this->err = this->cl_kernel.setArg(this->arg_count++, arg);
     clerror::throw_opencl_error(this->err);
   }
@@ -137,8 +131,6 @@ public:
                    std::vector<T>    &vector,
                    cl_mem_flags       flags = CL_MEM_READ_WRITE)
   {
-    this->validate_argument(this->arg_count, id, "buffer");
-
     Buffer buffer;
     buffer.vector_ref = static_cast<void *>(vector.data());
     buffer.size = vector_sizeof<T>(vector);
@@ -156,8 +148,7 @@ public:
   }
 
   /**
-   * @brief Binds a const host vector as a 1D OpenCL buffer (backward
-   * compatibility overload).
+   * @brief Binds a const host vector as a 1D OpenCL buffer (backward compatibility overload).
    * @tparam T The element type.
    * @param id A unique string ID.
    * @param vector Ref to the const host vector.
@@ -181,8 +172,7 @@ public:
                    Direction           direction);
 
   /**
-   * @brief Binds a host vector as a 2D float image (backward compatibility
-   * overload).
+   * @brief Binds a host vector as a 2D float image (backward compatibility overload).
    */
   void bind_imagef(const std::string  &id,
                    std::vector<float> &vector,
@@ -191,8 +181,7 @@ public:
                    bool                is_out = false);
 
   /**
-   * @brief Binds a const host vector as a 2D float image (backward
-   * compatibility overload).
+   * @brief Binds a const host vector as a 2D float image (backward compatibility overload).
    */
   void bind_imagef(const std::string        &id,
                    const std::vector<float> &vector,
@@ -203,30 +192,26 @@ public:
   /**
    * @brief Executes the kernel over a 1D range.
    * @param total_elements The total size of work-items.
-   * @param p_elapsed_time Optional out parameter to receive execution duration
-   * in milliseconds.
+   * @param p_elapsed_time Optional out parameter to receive execution duration in milliseconds.
    */
   void execute(int total_elements, float *p_elapsed_time = nullptr);
 
   /**
    * @brief Executes the kernel over a 2D range.
    * @param global_range_2d The 2D dimensions of work-items (width, height).
-   * @param p_elapsed_time Optional out parameter to receive execution duration
-   * in milliseconds.
+   * @param p_elapsed_time Optional out parameter to receive execution duration in milliseconds.
    */
   void execute(const std::vector<int> &global_range_2d,
                float                  *p_elapsed_time = nullptr);
 
   /**
-   * @brief Reads data back from the specified device buffer to its registered
-   * host vector.
+   * @brief Reads data back from the specified device buffer to its registered host vector.
    * @param id The unique string ID of the buffer.
    */
   void read_buffer(const std::string &id);
 
   /**
-   * @brief Reads data back from the specified 2D device image to its registered
-   * host vector.
+   * @brief Reads data back from the specified 2D device image to its registered host vector.
    * @param id The unique string ID of the image.
    */
   void read_imagef(const std::string &id);
@@ -237,15 +222,13 @@ public:
   void reset_argcount();
 
   /**
-   * @brief Writes data from the registered host vector to the specified device
-   * buffer.
+   * @brief Writes data from the registered host vector to the specified device buffer.
    * @param id The unique string ID of the buffer.
    */
   void write_buffer(const std::string &id);
 
   /**
-   * @brief Writes data from the registered host vector to the specified 2D
-   * device image.
+   * @brief Writes data from the registered host vector to the specified 2D device image.
    * @param id The unique string ID of the image.
    */
   void write_imagef(const std::string &id);
@@ -264,12 +247,6 @@ private:
   std::map<std::string, Image2D> images_2d;
 
   int err = 0;
-
-  // Internal validation helper to verify argument names and types using OpenCL
-  // reflection
-  void validate_argument(int                index,
-                         const std::string &expected_name,
-                         const std::string &cpp_type_name);
 };
 
 } // namespace clwrapper

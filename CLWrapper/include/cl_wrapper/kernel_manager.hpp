@@ -130,7 +130,7 @@ private:
 
   std::string full_sources = "";
 
-  std::string build_options = "-cl-kernel-arg-info";
+  std::string build_options = "";
 
   // Mutex protecting access to compilation and program state
   mutable std::shared_mutex state_mutex;
