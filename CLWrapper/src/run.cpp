@@ -142,7 +142,7 @@ void Run::execute(const std::vector<int> &global_range_2d,
 
   auto t0 = std::chrono::high_resolution_clock::now();
 
-  this->err = this->queue.flush();
+  this->err = this->queue.finish();
   clerror::throw_opencl_error(this->err);
 
   if (p_elapsed_time)
