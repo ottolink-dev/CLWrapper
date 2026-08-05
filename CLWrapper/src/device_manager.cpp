@@ -21,8 +21,8 @@ DeviceManager::DeviceManager()
 
   if (platforms.empty()) throw std::runtime_error("No OpenCL platforms found!");
 
-  int best_platform_idx = -1;
-  int best_device_idx = -1;
+  int    best_platform_idx = -1;
+  int    best_device_idx = -1;
   double best_score = -1.0;
 
   Logger::log()->trace("checking device performances...");
@@ -54,7 +54,8 @@ DeviceManager::DeviceManager()
 
   if (best_platform_idx == -1 || best_device_idx == -1)
   {
-    throw std::runtime_error("No OpenCL devices matching the device type filter were found!");
+    throw std::runtime_error(
+        "No OpenCL devices matching the device type filter were found!");
   }
 
   // eventually assign the platform / device
@@ -62,7 +63,8 @@ DeviceManager::DeviceManager()
   platforms[best_platform_idx].getDevices(this->device_type, &devices);
   if (devices.empty())
   {
-    throw std::runtime_error("Selected platform has no devices matching the device type filter!");
+    throw std::runtime_error(
+        "Selected platform has no devices matching the device type filter!");
   }
   this->cl_device = devices[best_device_idx];
   this->platform_id = best_platform_idx;
@@ -88,15 +90,17 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
   if (type & CL_DEVICE_TYPE_GPU)
   {
     score += 10000.0;
-    
+
     // 2. Discrete vs Integrated GPU (favor discrete)
     cl_bool unified_mem = CL_TRUE;
     try
     {
       unified_mem = device.getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
     }
-    catch (...) {} // Fallback if unified memory attribute is not supported
-    
+    catch (...)
+    {
+    } // Fallback if unified memory attribute is not supported
+
     if (unified_mem == CL_FALSE)
     {
       score += 5000.0;
@@ -123,7 +127,9 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
     compute_units = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
     clock_freq = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 
   score += static_cast<double>(compute_units) * clock_freq * 1e-3;
 
@@ -133,14 +139,17 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
   {
     global_mem = device.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
   }
-  catch (...) {}
+  catch (...)
+  {
+  }
 
   score += static_cast<double>(global_mem) * 1e-12;
 
   return score;
 }
 
-std::map<std::pair<size_t, size_t>, std::string> DeviceManager::get_all_available_devices()
+std::map<std::pair<size_t, size_t>, std::string> DeviceManager::
+    get_all_available_devices()
 {
   std::map<std::pair<size_t, size_t>, std::string> device_map = {};
 
@@ -298,7 +307,10 @@ bool DeviceManager::set_device(size_t platform_id, size_t device_index)
 
   if (platform_id >= platforms.size())
   {
-    Logger::log()->error("Platform ID {} is out of bounds (total platforms: {})", platform_id, platforms.size());
+    Logger::log()->error(
+        "Platform ID {} is out of bounds (total platforms: {})",
+        platform_id,
+        platforms.size());
     return false;
   }
 
@@ -307,7 +319,11 @@ bool DeviceManager::set_device(size_t platform_id, size_t device_index)
 
   if (device_index >= devices.size())
   {
-    Logger::log()->error("Device index {} is out of bounds for platform {} (total devices: {})", device_index, platform_id, devices.size());
+    Logger::log()->error(
+        "Device index {} is out of bounds for platform {} (total devices: {})",
+        device_index,
+        platform_id,
+        devices.size());
     return false;
   }
 
