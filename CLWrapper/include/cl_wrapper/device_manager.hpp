@@ -5,12 +5,12 @@
 /**
  * @file device_manager.hpp
  * @author Otto Link (otto.link.bv@gmail.com)
- * @brief Singleton manager to handle OpenCL device querying, selection, and
- * metadata retrieval.
+ * @brief Singleton manager to handle OpenCL device querying, selection, and metadata retrieval.
  * @copyright Copyright (c) 2025
  */
 #pragma once
 #include <map>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 
@@ -21,11 +21,10 @@ namespace clwrapper
 
 /**
  * @class DeviceManager
- * @brief Handles the initialization, management, and selection of OpenCL
- * platforms and devices.
- *
- * Provides features for automatic optimal device discovery, manual selection of
- * platforms/devices, and querying detailed hardware and execution limits.
+ * @brief Handles the initialization, management, and selection of OpenCL platforms and devices.
+ * 
+ * Provides features for automatic optimal device discovery, manual selection of platforms/devices,
+ * and querying detailed hardware and execution limits.
  */
 class DeviceManager
 {
@@ -42,15 +41,13 @@ public:
   static DeviceManager &get_instance();
 
   /**
-   * @brief Access the OpenCL device attached to the active DeviceManager
-   * instance.
+   * @brief Access the OpenCL device attached to the active DeviceManager instance.
    * @return The currently active cl::Device.
    */
   static cl::Device device();
 
   /**
-   * @brief Checks if the DeviceManager singleton is ready to use and
-   * initialized.
+   * @brief Checks if the DeviceManager singleton is ready to use and initialized.
    * @return True if initialized successfully; false otherwise.
    */
   static bool is_ready();
@@ -64,8 +61,7 @@ public:
 
   /**
    * @brief Lists all the available devices (first device of each platform).
-   * @return A map mapping platform IDs to their respective primary device
-   * names.
+   * @return A map mapping platform IDs to their respective primary device names.
    */
   std::map<size_t, std::string> get_available_devices();
 
@@ -94,8 +90,7 @@ public:
   size_t get_device_index() const;
 
   /**
-   * @brief Get the ID of the active platform (backward compatibility alias for
-   * get_platform_id).
+   * @brief Get the ID of the active platform (backward compatibility alias for get_platform_id).
    * @return The active platform ID.
    */
   size_t get_device_id() const;
@@ -115,8 +110,7 @@ public:
   bool set_device(size_t platform_id);
 
   /**
-   * @brief Set the active device with explicit platform and device index
-   * coordinates.
+   * @brief Set the active device with explicit platform and device index coordinates.
    * @param platform_id The platform ID to use.
    * @param device_index The device index on that platform.
    * @return True if successfully set; false otherwise.
@@ -124,8 +118,7 @@ public:
   bool set_device(size_t platform_id, size_t device_index);
 
   /**
-   * @brief Configures the type of device filtered during platform checks (CPU,
-   * GPU, etc.).
+   * @brief Configures the type of device filtered during platform checks (CPU, GPU, etc.).
    * @param new_device_type The OpenCL device type filter.
    */
   void set_device_type(cl_device_type new_device_type);
@@ -192,6 +185,28 @@ public:
 
   /** @} */
 
+  /**
+   * @name Active Platform Metadata Accessors
+   * @{
+   */
+
+  /**
+   * @brief Gets the name of the active platform.
+   */
+  std::string get_platform_name() const;
+
+  /**
+   * @brief Gets the vendor of the active platform.
+   */
+  std::string get_platform_vendor() const;
+
+  /**
+   * @brief Gets the OpenCL version supported by the active platform.
+   */
+  std::string get_platform_version() const;
+
+  /** @} */
+
 private:
   cl::Device cl_device;
 
@@ -201,12 +216,20 @@ private:
   // allowed device type (CL_DEVICE_TYPE_ALL | GPU | CPU)
   cl_device_type device_type = CL_DEVICE_TYPE_ALL;
 
+  // Mutex protecting access to device selection and state
+  mutable std::shared_mutex state_mutex;
+
   // Private constructor
   DeviceManager();
 
-  // Delete copy constructor and assignment operator to enforce singleton
+  // Internal helper to search and select the optimal device (assumes state_mutex is already locked for writing)
+  void select_optimal_device();
+
+  // Delete copy/move constructors and assignment operators to enforce singleton
   DeviceManager(const DeviceManager &) = delete;
   DeviceManager &operator=(const DeviceManager &) = delete;
+  DeviceManager(DeviceManager &&) = delete;
+  DeviceManager &operator=(DeviceManager &&) = delete;
 };
 
 /**
