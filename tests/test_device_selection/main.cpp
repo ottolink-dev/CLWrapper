@@ -7,32 +7,39 @@
 
 int main()
 {
-  auto &dm = clwrapper::DeviceManager::get_instance();
+  auto  &dm = clwrapper::DeviceManager::get_instance();
   size_t original_platform = dm.get_platform_id();
   size_t original_device = dm.get_device_index();
 
   std::map<std::pair<size_t, size_t>, std::string> cl_device_map =
       dm.get_all_available_devices();
 
-  std::cout << "================================================================================\n";
+  std::cout << "==============================================================="
+               "=================\n";
   std::cout << "AVAILABLE OPENCL DEVICES & SPECIFICATIONS\n";
-  std::cout << "================================================================================\n";
+  std::cout << "==============================================================="
+               "=================\n";
 
   for (auto &[coords, name] : cl_device_map)
   {
     if (dm.set_device(coords.first, coords.second))
     {
-      std::string type_str = "Unknown";
+      std::string    type_str = "Unknown";
       cl_device_type type = dm.get_device_type();
-      if (type & CL_DEVICE_TYPE_GPU) type_str = "GPU";
-      else if (type & CL_DEVICE_TYPE_CPU) type_str = "CPU";
-      else if (type & CL_DEVICE_TYPE_ACCELERATOR) type_str = "Accelerator";
+      if (type & CL_DEVICE_TYPE_GPU)
+        type_str = "GPU";
+      else if (type & CL_DEVICE_TYPE_CPU)
+        type_str = "CPU";
+      else if (type & CL_DEVICE_TYPE_ACCELERATOR)
+        type_str = "Accelerator";
 
       double score = dm.evaluate_device(dm.get_device());
-      double global_mem_gb = static_cast<double>(dm.get_global_mem_size()) / (1024 * 1024 * 1024);
+      double global_mem_gb = static_cast<double>(dm.get_global_mem_size()) /
+                             (1024 * 1024 * 1024);
       double local_mem_kb = static_cast<double>(dm.get_local_mem_size()) / 1024;
 
-      std::cout << "Platform: " << coords.first << " | Device: " << coords.second << "\n";
+      std::cout << "Platform: " << coords.first
+                << " | Device: " << coords.second << "\n";
       std::cout << "  Name:         " << dm.get_device_name() << "\n";
       std::cout << "  Vendor:       " << dm.get_device_vendor() << "\n";
       std::cout << "  Version:      " << dm.get_device_version() << "\n";
@@ -42,7 +49,8 @@ int main()
       std::cout << "  Global Mem:   " << global_mem_gb << " GB\n";
       std::cout << "  Local Mem:    " << local_mem_kb << " KB\n";
       std::cout << "  Score:        " << score << "\n";
-      std::cout << "--------------------------------------------------------------------------------\n";
+      std::cout << "-----------------------------------------------------------"
+                   "---------------------\n";
     }
   }
 
@@ -50,7 +58,8 @@ int main()
   dm.set_device(original_platform, original_device);
 
   std::cout << "\nSelected Default Device: " << dm.get_device_name() << "\n";
-  std::cout << "================================================================================\n";
+  std::cout << "==============================================================="
+               "=================\n";
 
   // --- execute the same kernel on each device
 
@@ -65,7 +74,8 @@ int main()
   {
     std::cout << "\n\n--- Running kernel on " << name << " ---\n\n";
 
-    if (clwrapper::DeviceManager::get_instance().set_device(coords.first, coords.second))
+    if (clwrapper::DeviceManager::get_instance().set_device(coords.first,
+                                                            coords.second))
     {
       // program needs to be rebuild for the current device
       clwrapper::KernelManager::get_instance().build_program();
