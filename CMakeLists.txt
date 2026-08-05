@@ -14,7 +14,7 @@ add_definitions("-DCL_HPP_TARGET_OPENCL_VERSION=120")
 add_subdirectory(${PROJECT_SOURCE_DIR}/CLWrapper)
 add_subdirectory(${PROJECT_SOURCE_DIR}/external)
 
-option(CLWRAPPER_ENABLE_TESTS "Enable unit tests using Google Test" ON)
+option(CLWRAPPER_ENABLE_TESTS "Enable unit tests using Google Test" OFF)
 if(CLWRAPPER_ENABLE_TESTS)
   add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
 endif()
