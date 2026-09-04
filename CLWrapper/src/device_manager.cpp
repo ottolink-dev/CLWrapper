@@ -48,6 +48,25 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       {
         score += 5000.0;
       }
+
+      // 3. Vendor preference (favor non-Intel GPUs over Intel integrated/discrete GPUs)
+      try
+      {
+        std::string vendor = device.getInfo<CL_DEVICE_VENDOR>();
+        std::string lower_vendor = vendor;
+        std::transform(lower_vendor.begin(),
+                       lower_vendor.end(),
+                       lower_vendor.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+
+        if (lower_vendor.find("intel") == std::string::npos)
+        {
+          score += 2000.0;
+        }
+      }
+      catch (...)
+      {
+      }
     }
     else if (type & CL_DEVICE_TYPE_ACCELERATOR)
     {
@@ -62,7 +81,7 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       score += 100.0;
     }
 
-    // 3. Compute capacity (Compute Units * Clock Frequency)
+    // 4. Compute capacity (Compute Units * Clock Frequency)
     cl_uint compute_units = 1;
     cl_uint clock_freq = 1;
     try
@@ -76,7 +95,7 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
 
     score += static_cast<double>(compute_units) * clock_freq * 1e-3;
 
-    // 4. Memory capacity tie-breaker
+    // 5. Memory capacity tie-breaker
     cl_ulong global_mem = 0;
     try
     {

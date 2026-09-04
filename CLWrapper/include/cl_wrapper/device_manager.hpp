@@ -183,8 +183,8 @@ public:
    * @brief Computes a robustness capability score for a given OpenCL device.
    *
    * Scores are calculated based on device type (GPU > Accelerator > CPU),
-   * discrete vs unified memory, compute capacity (units * clock speed), and
-   * total global memory size.
+   * discrete vs unified memory, vendor preference (favor non-Intel GPUs),
+   * compute capacity (units * clock speed), and total global memory size.
    *
    * @param device The cl::Device to evaluate.
    * @return A numerical score representing the capability level of the device.
