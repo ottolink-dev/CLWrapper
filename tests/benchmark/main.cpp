@@ -43,7 +43,8 @@ int main()
 
   // Math heavy math-loop kernel to measure raw compute capacity
   const std::string kernel_code =
-      "__kernel void benchmark_kernel(__global const float* a, __global float* b, int iterations) {\n"
+      "__kernel void benchmark_kernel(__global const float* a, __global float* "
+      "b, int iterations) {\n"
       "    int id = get_global_id(0);\n"
       "    float val = a[id];\n"
       "    for (int i = 0; i < iterations; ++i) {\n"
@@ -55,8 +56,8 @@ int main()
 
   std::vector<BenchmarkResult> results;
 
-  const int size = 131072; // 128K elements
-  const int iterations = 1000;
+  const int          size = 131072; // 128K elements
+  const int          iterations = 1000;
   std::vector<float> input(size, 0.5f);
   std::vector<float> output(size, 0.0f);
 
@@ -88,11 +89,14 @@ int main()
       run.read_buffer("b");
 
       // Extract device specifications
-      std::string type_str = "Unknown";
+      std::string    type_str = "Unknown";
       cl_device_type type = dm.get_device_type();
-      if (type & CL_DEVICE_TYPE_GPU) type_str = "GPU";
-      else if (type & CL_DEVICE_TYPE_CPU) type_str = "CPU";
-      else if (type & CL_DEVICE_TYPE_ACCELERATOR) type_str = "Accelerator";
+      if (type & CL_DEVICE_TYPE_GPU)
+        type_str = "GPU";
+      else if (type & CL_DEVICE_TYPE_CPU)
+        type_str = "CPU";
+      else if (type & CL_DEVICE_TYPE_ACCELERATOR)
+        type_str = "Accelerator";
 
       double score = dm.evaluate_device(dm.get_device());
 
@@ -113,29 +117,33 @@ int main()
   dm.set_device(original_platform, original_device);
 
   // Sort results by execution time (fastest first)
-  std::sort(results.begin(), results.end(),
-            [](const BenchmarkResult &r1, const BenchmarkResult &r2) {
-              return r1.execution_time_ms < r2.execution_time_ms;
-            });
+  std::sort(results.begin(),
+            results.end(),
+            [](const BenchmarkResult &r1, const BenchmarkResult &r2)
+            { return r1.execution_time_ms < r2.execution_time_ms; });
 
   std::cout << "\n\n";
-  std::cout << "===================================================================================\n";
-  std::cout << "                                  BENCHMARK RESULTS                                \n";
-  std::cout << "===================================================================================\n";
+  std::cout << "==============================================================="
+               "====================\n";
+  std::cout << "                                  BENCHMARK RESULTS            "
+               "                    \n";
+  std::cout << "==============================================================="
+               "====================\n";
   std::cout << " " << std::left << std::setw(40) << "Device Name"
-            << std::setw(15) << "Type"
-            << std::setw(15) << "Eval Score"
+            << std::setw(15) << "Type" << std::setw(15) << "Eval Score"
             << std::setw(15) << "Time (ms)" << "\n";
-  std::cout << "-----------------------------------------------------------------------------------\n";
+  std::cout << "---------------------------------------------------------------"
+               "--------------------\n";
 
   for (const auto &res : results)
   {
-    std::cout << " " << std::left << std::setw(40) << res.name
-              << std::setw(15) << res.type
-              << std::setw(15) << std::fixed << std::setprecision(2) << res.score
-              << std::setw(15) << std::fixed << std::setprecision(3) << res.execution_time_ms << "\n";
+    std::cout << " " << std::left << std::setw(40) << res.name << std::setw(15)
+              << res.type << std::setw(15) << std::fixed << std::setprecision(2)
+              << res.score << std::setw(15) << std::fixed
+              << std::setprecision(3) << res.execution_time_ms << "\n";
   }
-  std::cout << "===================================================================================\n";
+  std::cout << "==============================================================="
+               "====================\n";
 
   return 0;
 }
