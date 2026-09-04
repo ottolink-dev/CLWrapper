@@ -28,13 +28,10 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
 
   try
   {
-    // 1. Device Type Priority
+    // 1. Base score by tier
     cl_device_type type = device.getInfo<CL_DEVICE_TYPE>();
     if (type & CL_DEVICE_TYPE_GPU)
     {
-      score += 10000.0;
-
-      // 2. Discrete vs Integrated GPU (favor discrete)
       cl_bool unified_mem = CL_TRUE;
       try
       {
@@ -42,35 +39,51 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       }
       catch (...)
       {
-      } // Fallback if unified memory attribute is not supported
-
-      if (unified_mem == CL_FALSE)
-      {
-        score += 5000.0;
       }
 
-      // 3. Vendor preference (favor non-Intel GPUs over Intel integrated/discrete GPUs)
+      std::string lower_vendor = "";
       try
       {
-        std::string vendor = device.getInfo<CL_DEVICE_VENDOR>();
-        std::string lower_vendor = vendor;
+        lower_vendor = device.getInfo<CL_DEVICE_VENDOR>();
         std::transform(lower_vendor.begin(),
                        lower_vendor.end(),
                        lower_vendor.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-
-        if (lower_vendor.find("intel") == std::string::npos)
-        {
-          score += 2000.0;
-        }
       }
       catch (...)
       {
       }
+
+      bool is_intel = (lower_vendor.find("intel") != std::string::npos);
+
+      if (unified_mem == CL_FALSE)
+      {
+        // Discrete GPU
+        if (!is_intel)
+        {
+          score += 1000000.0; // Dedicated non-Intel GPU (NVIDIA / AMD)
+        }
+        else
+        {
+          score += 500000.0; // Dedicated Intel GPU (Arc discrete)
+        }
+      }
+      else
+      {
+        // Integrated GPU
+        if (!is_intel)
+        {
+          score += 100000.0; // Integrated non-Intel GPU (AMD iGPU, Apple)
+        }
+        else
+        {
+          score += 50000.0; // Integrated Intel GPU (Iris Xe / UHD)
+        }
+      }
     }
     else if (type & CL_DEVICE_TYPE_ACCELERATOR)
     {
-      score += 5000.0;
+      score += 10000.0;
     }
     else if (type & CL_DEVICE_TYPE_CPU)
     {
@@ -81,7 +94,8 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
       score += 100.0;
     }
 
-    // 4. Compute capacity (Compute Units * Clock Frequency)
+    // 2. Compute capacity intra-tier tie-breaker (Compute Units * Clock
+    // Frequency in MHz)
     cl_uint compute_units = 1;
     cl_uint clock_freq = 1;
     try
@@ -95,7 +109,7 @@ double DeviceManager::evaluate_device(const cl::Device &device) const
 
     score += static_cast<double>(compute_units) * clock_freq * 1e-3;
 
-    // 5. Memory capacity tie-breaker
+    // 3. Memory capacity intra-tier tie-breaker
     cl_ulong global_mem = 0;
     try
     {
