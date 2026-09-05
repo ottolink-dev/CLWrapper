@@ -150,3 +150,83 @@ TEST(RunTest, InOutImageSharingAndPingPong)
     EXPECT_FLOAT_EQ(a[i], 12.0f);
   }
 }
+
+TEST(RunTest, SharedQueueAsyncAcrossRuns)
+{
+  KernelManager &km = KernelManager::get_instance();
+  km.clear_sources();
+
+  const std::string code =
+      "__kernel void img_scale(__read_only image2d_t src, __write_only "
+      "image2d_t dest) {\n"
+      "    int x = get_global_id(0);\n"
+      "    int y = get_global_id(1);\n"
+      "    if (x < get_image_width(src) && y < get_image_height(src)) {\n"
+      "        const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | "
+      "CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;\n"
+      "        write_imagef(dest, (int2)(x, y), 2.0f * read_imagef(src, "
+      "sampler, (int2)(x, y)));\n"
+      "    }\n"
+      "}\n"
+      "__kernel void img_add_one(__read_only image2d_t src, __write_only "
+      "image2d_t dest) {\n"
+      "    int x = get_global_id(0);\n"
+      "    int y = get_global_id(1);\n"
+      "    if (x < get_image_width(src) && y < get_image_height(src)) {\n"
+      "        const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | "
+      "CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;\n"
+      "        write_imagef(dest, (int2)(x, y), 1.0f + read_imagef(src, "
+      "sampler, (int2)(x, y)));\n"
+      "    }\n"
+      "}\n";
+
+  km.add_kernel(code, true, true);
+
+  const int          width = 4;
+  const int          height = 3;
+  std::vector<float> a(width * height, 1.0f);
+  std::vector<float> b(width * height, 0.0f);
+
+  // run1: b = 2a ; run2: a = b + 1, both on one in-order queue
+  clwrapper::Run run1("img_scale");
+  run1.bind_imagef("a", a, width, height, Direction::INOUT);
+  run1.bind_imagef("b", b, width, height, Direction::INOUT);
+
+  clwrapper::Run run2("img_add_one", run1.get_queue());
+  run2.bind_image2d("b", run1.get_image2d("b"));
+  run2.bind_image2d("a", run1.get_image2d("a"));
+
+  // a: 1 -> 3 -> 7 -> 15 ; b: 2 -> 6 -> 14 (only correct if ordered)
+  for (int it = 0; it < 3; ++it)
+  {
+    run1.execute_async({width, height});
+    run2.execute_async({width, height});
+  }
+  run2.finish();
+
+  run2.read_imagef("a");
+  run2.read_imagef("b");
+
+  for (int i = 0; i < width * height; ++i)
+  {
+    EXPECT_FLOAT_EQ(a[i], 15.0f);
+    EXPECT_FLOAT_EQ(b[i], 14.0f);
+  }
+
+  // 1D variant compiles and runs
+  std::vector<float> p(8, 1.0f);
+  std::vector<float> q(8, 0.0f);
+  const std::string  code1d = "__kernel void vec_scale(__global const float* "
+                              "a, __global float* b) { int i = "
+                              "get_global_id(0); b[i] = 3.0f * a[i]; }\n";
+  km.add_kernel(code1d, true, true);
+  clwrapper::Run run3("vec_scale");
+  run3.bind_buffer("p", p);
+  run3.bind_buffer("q", q);
+  run3.write_buffer("p");
+  run3.execute_async(8);
+  run3.finish();
+  run3.read_buffer("q");
+  for (int i = 0; i < 8; ++i)
+    EXPECT_FLOAT_EQ(q[i], 3.0f);
+}

@@ -87,6 +87,16 @@ public:
   Run(const std::string &kernel_name);
 
   /**
+   * @brief Constructs a Run that enqueues on an existing command queue.
+   * Several Runs sharing one in-order queue execute in submission order
+   * without host synchronisation, which lets a multi-kernel loop keep its
+   * data on the device (see execute_async / finish).
+   * @param kernel_name The name of the kernel to bind and run.
+   * @param queue       Queue to share, typically another Run's get_queue().
+   */
+  Run(const std::string &kernel_name, const cl::CommandQueue &queue);
+
+  /**
    * @brief Destructor. Automatically flushes and finishes active command
    * queues.
    */
@@ -234,6 +244,32 @@ public:
    */
   void execute(const std::vector<int> &global_range_2d,
                float                  *p_elapsed_time = nullptr);
+
+  /**
+   * @brief Enqueues the kernel over a 1D range and returns immediately. Call
+   * finish() before reading results back.
+   * @param total_elements The total size of work-items.
+   */
+  void execute_async(int total_elements);
+
+  /**
+   * @brief Enqueues the kernel over a 2D range and returns immediately. Call
+   * finish() before reading results back.
+   * @param global_range_2d The 2D dimensions of work-items (width, height).
+   */
+  void execute_async(const std::vector<int> &global_range_2d);
+
+  /**
+   * @brief Blocks until every command enqueued on this Run's queue completed.
+   */
+  void finish();
+
+  /**
+   * @brief Access the command queue used by this Run, to share it with
+   * another Run.
+   * @return The queue.
+   */
+  cl::CommandQueue get_queue() const;
 
   /**
    * @brief Reads data back from the specified device buffer to its registered

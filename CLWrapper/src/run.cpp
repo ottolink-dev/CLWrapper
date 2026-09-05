@@ -26,6 +26,18 @@ Run::Run(const std::string &kernel_name) : kernel_name(kernel_name)
   clerror::throw_opencl_error(this->err);
 }
 
+Run::Run(const std::string &kernel_name, const cl::CommandQueue &queue)
+    : kernel_name(kernel_name), queue(queue)
+{
+  Logger::log()->trace("Run::Run [{}] (shared queue)",
+                       this->kernel_name.c_str());
+
+  this->cl_kernel = cl::Kernel(KernelManager::program(),
+                               this->kernel_name.c_str(),
+                               &this->err);
+  clerror::throw_opencl_error(this->err);
+}
+
 Run::~Run()
 {
   this->queue.finish();
@@ -179,6 +191,46 @@ void Run::execute(const std::vector<int> &global_range_2d,
         std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() *
         1e-6f;
   }
+}
+
+void Run::execute_async(int total_elements)
+{
+  int bsize = 8;
+  int gsize = ((total_elements + bsize - 1) / bsize) * bsize;
+
+  const cl::NDRange global_work_size(gsize);
+
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
+}
+
+void Run::execute_async(const std::vector<int> &global_range_2d)
+{
+  int bsize = 8;
+  int gsize_x = ((global_range_2d[0] + bsize - 1) / bsize) * bsize;
+  int gsize_y = ((global_range_2d[1] + bsize - 1) / bsize) * bsize;
+
+  const cl::NDRange global_work_size(gsize_x, gsize_y);
+
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
+}
+
+void Run::finish()
+{
+  this->err = this->queue.finish();
+  clerror::throw_opencl_error(this->err);
+}
+
+cl::CommandQueue Run::get_queue() const
+{
+  return this->queue;
 }
 
 void Run::read_buffer(const std::string &id)
