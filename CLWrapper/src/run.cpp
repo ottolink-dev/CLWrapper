@@ -43,25 +43,32 @@ void Run::bind_imagef(const std::string  &id,
   img.width = width;
   img.height = height;
 
-  if (direction == Direction::IN)
-    img.cl_image = cl::Image2D(KernelManager::context(),
-                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                               cl::ImageFormat(CL_R, CL_FLOAT),
-                               width,
-                               height,
-                               0,
-                               (void *)img.vector_ref,
-                               &this->err);
-  else
-    img.cl_image = cl::Image2D(KernelManager::context(),
-                               CL_MEM_WRITE_ONLY,
-                               cl::ImageFormat(CL_R, CL_FLOAT),
-                               width,
-                               height,
-                               0,
-                               nullptr,
-                               &this->err);
+  cl_mem_flags flags = CL_MEM_WRITE_ONLY;
+  void        *host_ptr = nullptr;
 
+  switch (direction)
+  {
+  case Direction::IN:
+    flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    host_ptr = img.vector_ref;
+    break;
+  case Direction::OUT:
+    flags = CL_MEM_WRITE_ONLY;
+    break;
+  case Direction::INOUT:
+    flags = CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR;
+    host_ptr = img.vector_ref;
+    break;
+  }
+
+  img.cl_image = cl::Image2D(KernelManager::context(),
+                             flags,
+                             cl::ImageFormat(CL_R, CL_FLOAT),
+                             width,
+                             height,
+                             0,
+                             host_ptr,
+                             &this->err);
   clerror::throw_opencl_error(this->err);
 
   this->err = this->cl_kernel.setArg(this->arg_count++, img.cl_image);
@@ -91,6 +98,25 @@ void Run::bind_imagef(const std::string        &id,
                     width,
                     height,
                     is_out);
+}
+
+void Run::bind_image2d(const std::string &id, const Image2D &image)
+{
+  this->err = this->cl_kernel.setArg(this->arg_count++, image.cl_image);
+  clerror::throw_opencl_error(this->err);
+
+  this->images_2d[id] = image;
+}
+
+Image2D Run::get_image2d(const std::string &id) const
+{
+  auto it = this->images_2d.find(id);
+  if (it == this->images_2d.end())
+  {
+    Logger::log()->error("unknown 2D imagef id: [{}]", id.c_str());
+    return Image2D();
+  }
+  return it->second;
 }
 
 void Run::execute(int total_elements, float *p_elapsed_time)

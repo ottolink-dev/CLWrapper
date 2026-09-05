@@ -63,8 +63,10 @@ struct Image2D
  */
 enum Direction
 {
-  IN, ///< Input data flow (read-only on device).
-  OUT ///< Output data flow (write-only on device).
+  IN,   ///< Input data flow (read-only on device, initialised from host).
+  OUT,  ///< Output data flow (write-only on device).
+  INOUT ///< Read-write on device, initialised from host; may feed another
+        ///< kernel or be rebound with set_argument (ping-pong buffers).
 };
 
 /**
@@ -196,6 +198,25 @@ public:
                    int                       width,
                    int                       height,
                    bool                      is_out = false);
+
+  /**
+   * @brief Binds a device image created by another Run (or earlier by this
+   * one) to the next kernel argument and registers it under `id`, so
+   * read_imagef / write_imagef work from this Run too. No device memory is
+   * allocated and no data is transferred.
+   * @param id    A unique string ID for this Run.
+   * @param image Image descriptor obtained from get_image2d().
+   */
+  void bind_image2d(const std::string &id, const Image2D &image);
+
+  /**
+   * @brief Returns the descriptor of a bound 2D image so it can be shared
+   * with another Run (bind_image2d) or rebound to a different argument
+   * position with set_argument(pos, image.cl_image).
+   * @param id The unique string ID of the image.
+   * @return The image descriptor; empty (null cl_image) if the id is unknown.
+   */
+  Image2D get_image2d(const std::string &id) const;
 
   /**
    * @brief Executes the kernel over a 1D range.
