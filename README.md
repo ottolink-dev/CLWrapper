@@ -127,6 +127,34 @@ kernel void add_kernel_with_args(global float *A,
 )""
 ```
 
+### Keeping data on the device across kernels
+
+Several `Run` objects can share one in-order command queue and the same
+device images. Combined with `execute_async`, an iterative multi-kernel loop
+never touches host memory until the end:
+
+```cpp
+clwrapper::Run pass_a("kernel_a");
+pass_a.bind_imagef("x", x, nx, ny, clwrapper::Direction::INOUT);
+pass_a.bind_imagef("y", y, nx, ny, clwrapper::Direction::INOUT);
+
+clwrapper::Run pass_b("kernel_b", pass_a.get_queue());
+pass_b.bind_image2d("y", pass_a.get_image2d("y")); // same device image
+pass_b.bind_image2d("x", pass_a.get_image2d("x"));
+
+for (int it = 0; it < iterations; ++it)
+{
+  pass_a.execute_async({nx, ny}); // x -> y
+  pass_b.execute_async({nx, ny}); // y -> x
+}
+pass_b.finish();
+pass_b.read_imagef("x");
+```
+
+`Direction::INOUT` creates a read-write image initialised from the host.
+Use `set_argument(pos, run.get_image2d("id").cl_image)` to swap ping-pong
+buffers between iterations without re-uploading.
+
 ## Contributing
 
 If you find any incorrect or missing error codes, please use the [GitHub Issues](https://github.com/otto-link/CLErrorLookup/issues) to propose modifications. Contributions are always welcome and help ensure the accuracy and usefulness of the library.

@@ -63,8 +63,10 @@ struct Image2D
  */
 enum Direction
 {
-  IN, ///< Input data flow (read-only on device).
-  OUT ///< Output data flow (write-only on device).
+  IN,   ///< Input data flow (read-only on device, initialised from host).
+  OUT,  ///< Output data flow (write-only on device).
+  INOUT ///< Read-write on device, initialised from host; may feed another
+        ///< kernel or be rebound with set_argument (ping-pong buffers).
 };
 
 /**
@@ -83,6 +85,16 @@ public:
    * @param kernel_name The name of the kernel to bind and run.
    */
   Run(const std::string &kernel_name);
+
+  /**
+   * @brief Constructs a Run that enqueues on an existing command queue.
+   * Several Runs sharing one in-order queue execute in submission order
+   * without host synchronisation, which lets a multi-kernel loop keep its
+   * data on the device (see execute_async / finish).
+   * @param kernel_name The name of the kernel to bind and run.
+   * @param queue       Queue to share, typically another Run's get_queue().
+   */
+  Run(const std::string &kernel_name, const cl::CommandQueue &queue);
 
   /**
    * @brief Destructor. Automatically flushes and finishes active command
@@ -198,6 +210,25 @@ public:
                    bool                      is_out = false);
 
   /**
+   * @brief Binds a device image created by another Run (or earlier by this
+   * one) to the next kernel argument and registers it under `id`, so
+   * read_imagef / write_imagef work from this Run too. No device memory is
+   * allocated and no data is transferred.
+   * @param id    A unique string ID for this Run.
+   * @param image Image descriptor obtained from get_image2d().
+   */
+  void bind_image2d(const std::string &id, const Image2D &image);
+
+  /**
+   * @brief Returns the descriptor of a bound 2D image so it can be shared
+   * with another Run (bind_image2d) or rebound to a different argument
+   * position with set_argument(pos, image.cl_image).
+   * @param id The unique string ID of the image.
+   * @return The image descriptor; empty (null cl_image) if the id is unknown.
+   */
+  Image2D get_image2d(const std::string &id) const;
+
+  /**
    * @brief Executes the kernel over a 1D range.
    * @param total_elements The total size of work-items.
    * @param p_elapsed_time Optional out parameter to receive execution duration
@@ -213,6 +244,32 @@ public:
    */
   void execute(const std::vector<int> &global_range_2d,
                float                  *p_elapsed_time = nullptr);
+
+  /**
+   * @brief Enqueues the kernel over a 1D range and returns immediately. Call
+   * finish() before reading results back.
+   * @param total_elements The total size of work-items.
+   */
+  void execute_async(int total_elements);
+
+  /**
+   * @brief Enqueues the kernel over a 2D range and returns immediately. Call
+   * finish() before reading results back.
+   * @param global_range_2d The 2D dimensions of work-items (width, height).
+   */
+  void execute_async(const std::vector<int> &global_range_2d);
+
+  /**
+   * @brief Blocks until every command enqueued on this Run's queue completed.
+   */
+  void finish();
+
+  /**
+   * @brief Access the command queue used by this Run, to share it with
+   * another Run.
+   * @return The queue.
+   */
+  cl::CommandQueue get_queue() const;
 
   /**
    * @brief Reads data back from the specified device buffer to its registered

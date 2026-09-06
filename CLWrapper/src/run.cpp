@@ -26,6 +26,18 @@ Run::Run(const std::string &kernel_name) : kernel_name(kernel_name)
   clerror::throw_opencl_error(this->err);
 }
 
+Run::Run(const std::string &kernel_name, const cl::CommandQueue &queue)
+    : kernel_name(kernel_name), queue(queue)
+{
+  Logger::log()->trace("Run::Run [{}] (shared queue)",
+                       this->kernel_name.c_str());
+
+  this->cl_kernel = cl::Kernel(KernelManager::program(),
+                               this->kernel_name.c_str(),
+                               &this->err);
+  clerror::throw_opencl_error(this->err);
+}
+
 Run::~Run()
 {
   this->queue.finish();
@@ -43,25 +55,32 @@ void Run::bind_imagef(const std::string  &id,
   img.width = width;
   img.height = height;
 
-  if (direction == Direction::IN)
-    img.cl_image = cl::Image2D(KernelManager::context(),
-                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                               cl::ImageFormat(CL_R, CL_FLOAT),
-                               width,
-                               height,
-                               0,
-                               (void *)img.vector_ref,
-                               &this->err);
-  else
-    img.cl_image = cl::Image2D(KernelManager::context(),
-                               CL_MEM_WRITE_ONLY,
-                               cl::ImageFormat(CL_R, CL_FLOAT),
-                               width,
-                               height,
-                               0,
-                               nullptr,
-                               &this->err);
+  cl_mem_flags flags = CL_MEM_WRITE_ONLY;
+  void        *host_ptr = nullptr;
 
+  switch (direction)
+  {
+  case Direction::IN:
+    flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    host_ptr = img.vector_ref;
+    break;
+  case Direction::OUT:
+    flags = CL_MEM_WRITE_ONLY;
+    break;
+  case Direction::INOUT:
+    flags = CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR;
+    host_ptr = img.vector_ref;
+    break;
+  }
+
+  img.cl_image = cl::Image2D(KernelManager::context(),
+                             flags,
+                             cl::ImageFormat(CL_R, CL_FLOAT),
+                             width,
+                             height,
+                             0,
+                             host_ptr,
+                             &this->err);
   clerror::throw_opencl_error(this->err);
 
   this->err = this->cl_kernel.setArg(this->arg_count++, img.cl_image);
@@ -91,6 +110,25 @@ void Run::bind_imagef(const std::string        &id,
                     width,
                     height,
                     is_out);
+}
+
+void Run::bind_image2d(const std::string &id, const Image2D &image)
+{
+  this->err = this->cl_kernel.setArg(this->arg_count++, image.cl_image);
+  clerror::throw_opencl_error(this->err);
+
+  this->images_2d[id] = image;
+}
+
+Image2D Run::get_image2d(const std::string &id) const
+{
+  auto it = this->images_2d.find(id);
+  if (it == this->images_2d.end())
+  {
+    Logger::log()->error("unknown 2D imagef id: [{}]", id.c_str());
+    return Image2D();
+  }
+  return it->second;
 }
 
 void Run::execute(int total_elements, float *p_elapsed_time)
@@ -153,6 +191,46 @@ void Run::execute(const std::vector<int> &global_range_2d,
         std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() *
         1e-6f;
   }
+}
+
+void Run::execute_async(int total_elements)
+{
+  int bsize = 8;
+  int gsize = ((total_elements + bsize - 1) / bsize) * bsize;
+
+  const cl::NDRange global_work_size(gsize);
+
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
+}
+
+void Run::execute_async(const std::vector<int> &global_range_2d)
+{
+  int bsize = 8;
+  int gsize_x = ((global_range_2d[0] + bsize - 1) / bsize) * bsize;
+  int gsize_y = ((global_range_2d[1] + bsize - 1) / bsize) * bsize;
+
+  const cl::NDRange global_work_size(gsize_x, gsize_y);
+
+  this->err = this->queue.enqueueNDRangeKernel(this->cl_kernel,
+                                               cl::NullRange,
+                                               global_work_size,
+                                               cl::NullRange);
+  clerror::throw_opencl_error(this->err);
+}
+
+void Run::finish()
+{
+  this->err = this->queue.finish();
+  clerror::throw_opencl_error(this->err);
+}
+
+cl::CommandQueue Run::get_queue() const
+{
+  return this->queue;
 }
 
 void Run::read_buffer(const std::string &id)
