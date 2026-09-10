@@ -181,6 +181,39 @@ public:
   }
 
   /**
+   * @brief Binds a device buffer created by another Run (or earlier by this
+   * one) to the next kernel argument and registers it under `id`, so
+   * read_buffer / write_buffer work from this Run too. No device memory is
+   * allocated and no data is transferred.
+   * @param id     A unique string ID for this Run.
+   * @param buffer Buffer descriptor obtained from get_buffer().
+   */
+  void bind_buffer(const std::string &id, const Buffer &buffer)
+  {
+    this->err = this->cl_kernel.setArg(this->arg_count++, buffer.cl_buffer);
+    clerror::throw_opencl_error(this->err);
+
+    this->buffers[id] = buffer;
+  }
+
+  /**
+   * @brief Returns the descriptor of a bound 1D buffer so it can be shared
+   * with another Run (bind_buffer) or rebound to a different argument position
+   * with set_argument(pos, buffer.cl_buffer).
+   * @param id The unique string ID of the buffer.
+   * @return The buffer descriptor; empty (null cl_buffer) if the id is unknown.
+   */
+  Buffer get_buffer(const std::string &id) const
+  {
+    auto it = this->buffers.find(id);
+    if (it == this->buffers.end())
+    {
+      return Buffer();
+    }
+    return it->second;
+  }
+
+  /**
    * @brief Binds a host vector as a 2D float image with a specified direction.
    */
   void bind_imagef(const std::string  &id,
