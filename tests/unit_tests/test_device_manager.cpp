@@ -5,6 +5,31 @@
 
 using namespace clwrapper;
 
+namespace
+{
+// Unit tests share the singleton and use the default ALL filter between cases.
+// Restore it even when a filter assertion fails or discovery throws.
+struct RestoreDeviceSelection
+{
+  DeviceManager &manager;
+  size_t         platform;
+  size_t         device;
+
+  explicit RestoreDeviceSelection(DeviceManager &manager)
+      : manager(manager), platform(manager.get_platform_id()),
+        device(manager.get_device_index())
+  {}
+
+  ~RestoreDeviceSelection()
+  {
+    EXPECT_NO_THROW({
+      manager.set_device_type(CL_DEVICE_TYPE_ALL);
+      EXPECT_TRUE(manager.set_device(platform, device));
+    });
+  }
+};
+} // namespace
+
 TEST(DeviceManagerTest, IsReadyTest)
 {
   EXPECT_TRUE(DeviceManager::is_ready());
@@ -81,20 +106,38 @@ TEST(DeviceManagerTest, SetDeviceBoundsCheckingTest)
 TEST(DeviceManagerTest, SetDeviceTypeFilterAutoRediscoveryTest)
 {
   DeviceManager &dm = DeviceManager::get_instance();
+  RestoreDeviceSelection restore(dm);
+  const cl_device_type available_type = dm.get_device_type();
 
-  // Remember current selection
-  size_t current_platform = dm.get_platform_id();
-  size_t current_device = dm.get_device_index();
+  // Rediscovery is supported on CPU-only and GPU-only hosts alike.
+  dm.set_device_type(available_type);
+  EXPECT_TRUE(dm.get_device_type() & available_type);
+  const auto devices = dm.get_all_available_devices();
+  EXPECT_FALSE(devices.empty());
+  EXPECT_EQ(devices.count({dm.get_platform_id(), dm.get_device_index()}), 1u);
+}
 
-  // Try to set device type filter to CPU
+TEST(DeviceManagerTest, CpuDeviceTypeFilterAutoRediscoveryWhenAvailable)
+{
+  // Discover the capability independently of DeviceManager's mutable filter.
+  std::vector<cl::Platform> platforms;
+  ASSERT_EQ(cl::Platform::get(&platforms), CL_SUCCESS);
+  bool cpu_available = false;
+  for (const auto &platform : platforms)
+  {
+    std::vector<cl::Device> devices;
+    const cl_int error = platform.getDevices(CL_DEVICE_TYPE_CPU, &devices);
+    ASSERT_TRUE(error == CL_SUCCESS || error == CL_DEVICE_NOT_FOUND);
+    cpu_available = cpu_available || !devices.empty();
+  }
+  if (!cpu_available)
+    GTEST_SKIP() << "No CPU OpenCL device is available; generic filter "
+                   "rediscovery is covered separately.";
+
+  DeviceManager &dm = DeviceManager::get_instance();
+  RestoreDeviceSelection restore(dm);
   dm.set_device_type(CL_DEVICE_TYPE_CPU);
-
-  // Verify that the newly selected device is a CPU
   EXPECT_TRUE(dm.get_device_type() & CL_DEVICE_TYPE_CPU);
-
-  // Restore original configuration
-  dm.set_device_type(CL_DEVICE_TYPE_ALL);
-  dm.set_device(current_platform, current_device);
 }
 
 TEST(DeviceManagerTest, DeviceSwitchAndExecutionTest)
